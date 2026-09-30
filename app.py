@@ -45,23 +45,31 @@ def parsear_sql_estricto(sql_texto):
     return orden_tablas, tablas, db_nombre
 
 # =====================================================================
-# PROTOCOLO HAYAKAWA 1 (Seguridad)
+# PROTOCOLO HAYAKAWA Y MODO SECRETO
 # =====================================================================
-st.subheader("🔒 [PROTOCOLO HAYAKAWA 1]")
-frase_input = st.text_input("Responde la pregunta de seguridad: *dame tu coleta la quiero tela exijo sera mi…*", type="password")
+st.subheader("🔒 [PROTOCOLO HAYAKAWA]")
+frase_input = st.text_input("Introduce la clave o frase de acceso secreta:", type="password")
 
 if frase_input:
-    acceso_total = (limpiar_texto(frase_input) == limpiar_texto("Mi reliquia familiar"))
+    texto_limpio = limpiar_texto(frase_input)
     
-    if acceso_total:
-        st.success("🔓 ¡Correcto! Acceso total concedido al núcleo de Kyomoto.")
+    if texto_limpio == limpiar_texto("trapitos sexys"):
+        st.success("🌸 ¡PROTOCOLO VIP ACTIVATED! a pumps le gustan los frutilupis 🍓🥣")
+        modos_disponibles = [
+            '4. 💎 MODO VIP: Vault de Respaldos Privados y Carga Maestra',
+            '1. Crear Plantilla Estructural de CSV',
+            '2. Esenciales: Inserts + CSV + Instructivos',
+            '3. MEGA PRO: Todo + CRUD + Auditoría'
+        ]
+    elif texto_limpio == limpiar_texto("Mi reliquia familiar"):
+        st.success("🔓 ¡Correcto! Acceso total al núcleo de Kyomoto.")
         modos_disponibles = [
             '1. Crear Plantilla Estructural de CSV',
             '2. Esenciales: Inserts + CSV + Instructivos',
-            '3. MEGA PRO: Todo + CRUD + Auditoría y Seguridad'
+            '3. MEGA PRO: Todo + CRUD + Auditoría'
         ]
     else:
-        st.warning("🚨 Respuesta incorrecta. Acceso restringido ÚNICAMENTE a Plantillas.")
+        st.warning("🚨 Contraseña incorrecta. Acceso restringido a Plantillas.")
         modos_disponibles = ['1. Crear Plantilla Estructural de CSV']
 
     st.markdown("---")
@@ -76,13 +84,17 @@ if frase_input:
     
     st.markdown("---")
     st.subheader("📁 CARGA DE ARCHIVOS")
-    st.info("💡 Sube tu archivo `.sql` (o `.txt`) y tus archivos de datos (`.csv`) aquí mismo.")
     
-    archivos_cargados = st.file_uploader("Seleccionar Archivos", accept_multiple_files=True, type=['sql', 'txt', 'csv'])
+    if "MODO VIP" in modo_elegido:
+        st.info("💎 [VAULT PRIVADO]: Sube aquí tus respaldos comprimidos (.zip) o archivos confidenciales para procesarlos al instante.")
+        archivos_cargados = st.file_uploader("Seleccionar Archivos VIP", accept_multiple_files=True, type=['sql', 'txt', 'csv', 'zip'])
+    else:
+        st.info("💡 Sube tu archivo `.sql` (o `.txt`) y tus archivos de datos (`.csv`) aquí mismo.")
+        archivos_cargados = st.file_uploader("Seleccionar Archivos", accept_multiple_files=True, type=['sql', 'txt', 'csv'])
     
     if st.button("🚀 Confirmar y Ejecutar Proceso", type="primary"):
         if not archivos_cargados:
-            st.error("❌ Error: Debes subir al menos el archivo .sql guía.")
+            st.error("❌ Error: Debes subir al menos un archivo.")
         else:
             uploaded_dict = {}
             for archivo in archivos_cargados:
@@ -111,61 +123,72 @@ if frase_input:
                         datos_en_memoria[ruta_csv_temp.stem] = pd.read_csv(ruta_csv_temp)
                     except Exception as e:
                         st.error(f"❌ Error leyendo el CSV {nombre}: {e}")
+                elif nombre.endswith('.zip') and "VIP" in modo_elegido:
+                    ruta_zip_temp = Path(nombre)
+                    with open(ruta_zip_temp, 'wb') as f: f.write(contenido)
+                    with zipfile.ZipFile(ruta_zip_temp, 'r') as zip_ref:
+                        zip_ref.extractall(carpeta_salida)
 
-            if not sql_texto:
-                st.error("❌ Error crítico: Se necesita obligatoriamente el archivo .sql guía.")
+            if "VIP" in modo_elegido and os.listdir(carpeta_salida) and not sql_texto:
+                st.success("💎 ¡Vault VIP procesado con éxito!")
+                zip_path = shutil.make_archive("Kyomoto_Vault_VIP", 'zip', carpeta_salida)
+                with open(zip_path, "rb") as f:
+                    st.download_button("📦 Descargar Vault Privado (.zip)", f, file_name="Kyomoto_Vault_VIP.zip", mime="application/zip")
+            elif not sql_texto and not ("VIP" in modo_elegido and os.listdir(carpeta_salida)):
+                st.error("❌ Error crítico: Se necesita obligatoriamente un archivo .sql guía o un paquete válido.")
             else:
-                orden_t, dic_t, nombre_db = parsear_sql_estricto(sql_texto)
-                modo_id = modo_elegido[0]
+                if sql_texto:
+                    orden_t, dic_t, nombre_db = parsear_sql_estricto(sql_texto)
+                    modo_id = modo_elegido[0]
 
-                if modo_id == "1":
-                    ruta_zip_plantillas = "Kyomoto_Plantillas_CSV.zip"
-                    with zipfile.ZipFile(ruta_zip_plantillas, 'w') as zipf:
-                        for t in orden_t:
-                            cols = dic_t[t]['columnas'] if dic_t[t]['columnas'] else ['id', 'columna1']
-                            df_temp = pd.DataFrame(columns=cols)
-                            csv_nombre = f"{t}_plantilla.csv"
-                            df_temp.to_csv(csv_nombre, index=False)
-                            zipf.write(csv_nombre)
-                    
-                    st.success("✅ Plantillas estructurales generadas con éxito.")
-                    with open(ruta_zip_plantillas, "rb") as f:
-                        st.download_button("📥 Descargar Plantillas CSV (.zip)", f, file_name="Kyomoto_Plantillas_CSV.zip", mime="application/zip")
-                else:
-                    timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-                    inserts_totales = []
-                    
-                    for t_sql in orden_t:
-                        df_a_usar = None
-                        for t_csv, df in datos_en_memoria.items():
-                            if limpiar_texto(t_sql) in limpiar_texto(t_csv) or limpiar_texto(t_csv) in limpiar_texto(t_sql):
-                                df_a_usar = df
-                                break
+                    if modo_id == "1":
+                        ruta_zip_plantillas = "Kyomoto_Plantillas_CSV.zip"
+                        with zipfile.ZipFile(ruta_zip_plantillas, 'w') as zipf:
+                            for t in orden_t:
+                                cols = dic_t[t]['columnas'] if dic_t[t]['columnas'] else ['id', 'columna1']
+                                df_temp = pd.DataFrame(columns=cols)
+                                csv_nombre = f"{t}_plantilla.csv"
+                                df_temp.to_csv(csv_nombre, index=False)
+                                zipf.write(csv_nombre)
                         
-                        if df_a_usar is None and datos_en_memoria:
-                            df_a_usar = list(datos_en_memoria.values())[0]
+                        st.success("✅ Plantillas estructurales generadas con éxito.")
+                        with open(ruta_zip_plantillas, "rb") as f:
+                            st.download_button("📥 Descargar Plantillas CSV (.zip)", f, file_name="Kyomoto_Plantillas_CSV.zip", mime="application/zip")
+                    else:
+                        timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+                        inserts_totales = []
+                        
+                        for t_sql in orden_t:
+                            df_a_usar = None
+                            for t_csv, df in datos_en_memoria.items():
+                                if limpiar_texto(t_sql) in limpiar_texto(t_csv) or limpiar_texto(t_csv) in limpiar_texto(t_sql):
+                                    df_a_usar = df
+                                    break
+                            
+                            if df_a_usar is None and datos_en_memoria:
+                                df_a_usar = list(datos_en_memoria.values())[0]
 
-                        if df_a_usar is not None and not df_a_usar.empty:
-                            cols = ", ".join(df_a_usar.columns)
-                            lineas_tabla = [f"\n-- INSERTS: {t_sql}"]
-                            for _, fila in df_a_usar.iterrows():
-                                vals = ["NULL" if pd.isna(v) else (str(v) if isinstance(v, (int, float)) else f"'{str(v).replace(chr(39), chr(39)+chr(39))}'") for v in fila]
-                                lineas_tabla.append(f"{cmd_sql} {t_sql} ({cols}) VALUES ({', '.join(vals)});")
-                            inserts_totales.append("\n".join(lineas_tabla))
+                            if df_a_usar is not None and not df_a_usar.empty:
+                                cols = ", ".join(df_a_usar.columns)
+                                lineas_tabla = [f"\n-- INSERTS: {t_sql}"]
+                                for _, fila in df_a_usar.iterrows():
+                                    vals = ["NULL" if pd.isna(v) else (str(v) if isinstance(v, (int, float)) else f"'{str(v).replace(chr(39), chr(39)+chr(39))}'") for v in fila]
+                                    lineas_tabla.append(f"{cmd_sql} {t_sql} ({cols}) VALUES ({', '.join(vals)});")
+                                inserts_totales.append("\n".join(lineas_tabla))
 
-                    inserts_texto = "\n".join(inserts_totales)
+                        inserts_texto = "\n".join(inserts_totales)
 
-                    with open(f"{carpeta_salida}/01_solo_inserts.sql", 'w', encoding='utf-8') as f: f.write(inserts_texto)
-                    with open(f"{carpeta_salida}/02_BACKUP_MAESTRO_{timestamp}.sql", 'w', encoding='utf-8') as f:
-                        f.write(sql_texto + "\n\n" + inserts_texto)
+                        with open(f"{carpeta_salida}/01_solo_inserts.sql", 'w', encoding='utf-8') as f: f.write(inserts_texto)
+                        with open(f"{carpeta_salida}/02_BACKUP_MAESTRO_{timestamp}.sql", 'w', encoding='utf-8') as f:
+                            f.write(sql_texto + "\n\n" + inserts_texto)
 
-                    with open(f"{carpeta_salida}/03_INSTRUCTIVO_IMPORTACION.txt", 'w', encoding='utf-8') as f:
-                        f.write(f"BASE DE DATOS: {nombre_db}\nORDEN ESTRICTO DE IMPORTACION:\n" + "\n".join([f"{i}. {t}" for i, t in enumerate(orden_t, 1)]))
+                        with open(f"{carpeta_salida}/03_INSTRUCTIVO_IMPORTACION.txt", 'w', encoding='utf-8') as f:
+                            f.write(f"BASE DE DATOS: {nombre_db}\nORDEN ESTRICTO DE IMPORTACION:\n" + "\n".join([f"{i}. {t}" for i, t in enumerate(orden_t, 1)]))
 
-                    if modo_id == "3":
-                        os.makedirs(f"{carpeta_salida}/07_mini_php_crud", exist_ok=True)
-                        with open(f"{carpeta_salida}/07_mini_php_crud/index.php", 'w', encoding='utf-8') as f:
-                            f.write(f'''<!DOCTYPE html>
+                        if modo_id == "3" or "VIP" in modo_elegido:
+                            os.makedirs(f"{carpeta_salida}/07_mini_php_crud", exist_ok=True)
+                            with open(f"{carpeta_salida}/07_mini_php_crud/index.php", 'w', encoding='utf-8') as f:
+                                f.write(f'''<!DOCTYPE html>
 <html lang="es">
 <head><meta charset="UTF-8"><title>Kyomoto CRUD - {nombre_db}</title></head>
 <body>
@@ -187,7 +210,7 @@ if frase_input:
 </body>
 </html>''')
 
-                    zip_path = shutil.make_archive("Kyomoto_Ecosystem", 'zip', carpeta_salida)
-                    st.success("✅ ¡Kit MEGA PRO Kyomoto (京本) generado con éxito!")
-                    with open(zip_path, "rb") as f:
-                        st.download_button("📦 Descargar Kit Kyomoto Ecosystem (.zip)", f, file_name="Kyomoto_Ecosystem.zip", mime="application/zip")
+                        zip_path = shutil.make_archive("Kyomoto_Ecosystem", 'zip', carpeta_salida)
+                        st.success("✅ ¡Kit Kyomoto (京本) generado con éxito!")
+                        with open(zip_path, "rb") as f:
+                            st.download_button("📦 Descargar Kit Kyomoto Ecosystem (.zip)", f, file_name="Kyomoto_Ecosystem.zip", mime="application/zip")
