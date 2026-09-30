@@ -56,12 +56,13 @@ if frase_input:
     if acceso_total:
         st.success("🔓 ¡Correcto! Acceso total concedido al núcleo de Kyomoto.")
         modos_disponibles = [
-            '1. Esenciales: Inserts + CSV + Instructivos',
-            '2. Crear Plantilla Estructural de CSV'
+            '1. Crear Plantilla Estructural de CSV',
+            '2. Esenciales: Inserts + CSV + Instructivos',
+            '3. MEGA PRO: Todo + CRUD + Auditoría y Seguridad'
         ]
     else:
-        st.warning("🚨 Respuesta incorrecta. Acceso restringido al Modo Básico.")
-        modos_disponibles = ['2. Crear Plantilla Estructural de CSV']
+        st.warning("🚨 Respuesta incorrecta. Acceso restringido ÚNICAMENTE a Plantillas.")
+        modos_disponibles = ['1. Crear Plantilla Estructural de CSV']
 
     st.markdown("---")
     st.subheader("⚙ CONFIGURACIÓN DE OPERACIÓN")
@@ -104,7 +105,6 @@ if frase_input:
                     except UnicodeDecodeError: decodificado = contenido.decode('latin-1')
                     if not sql_texto: sql_texto = decodificado
                 elif nombre.endswith('.csv'):
-                    # Guardamos temporalmente el CSV para leerlo con pandas
                     ruta_csv_temp = Path(nombre)
                     with open(ruta_csv_temp, 'wb') as f: f.write(contenido)
                     try:
@@ -116,8 +116,9 @@ if frase_input:
                 st.error("❌ Error crítico: Se necesita obligatoriamente el archivo .sql guía.")
             else:
                 orden_t, dic_t, nombre_db = parsear_sql_estricto(sql_texto)
+                modo_id = modo_elegido[0]
 
-                if "Crear Plantilla" in modo_elegido:
+                if modo_id == "1":
                     ruta_zip_plantillas = "Kyomoto_Plantillas_CSV.zip"
                     with zipfile.ZipFile(ruta_zip_plantillas, 'w') as zipf:
                         for t in orden_t:
@@ -131,20 +132,16 @@ if frase_input:
                     with open(ruta_zip_plantillas, "rb") as f:
                         st.download_button("📥 Descargar Plantillas CSV (.zip)", f, file_name="Kyomoto_Plantillas_CSV.zip", mime="application/zip")
                 else:
-                    # Generar Kit de Inserts flexible
                     timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
                     inserts_totales = []
                     
-                    # Mapear tablas disponibles con los CSVs subidos
                     for t_sql in orden_t:
                         df_a_usar = None
-                        # Buscar coincidencia flexible con los CSVs cargados
                         for t_csv, df in datos_en_memoria.items():
                             if limpiar_texto(t_sql) in limpiar_texto(t_csv) or limpiar_texto(t_csv) in limpiar_texto(t_sql):
                                 df_a_usar = df
                                 break
                         
-                        # Si no hay coincidencia exacta pero hay CSVs, tomamos el primero disponible para no bloquear
                         if df_a_usar is None and datos_en_memoria:
                             df_a_usar = list(datos_en_memoria.values())[0]
 
@@ -165,7 +162,32 @@ if frase_input:
                     with open(f"{carpeta_salida}/03_INSTRUCTIVO_IMPORTACION.txt", 'w', encoding='utf-8') as f:
                         f.write(f"BASE DE DATOS: {nombre_db}\nORDEN ESTRICTO DE IMPORTACION:\n" + "\n".join([f"{i}. {t}" for i, t in enumerate(orden_t, 1)]))
 
+                    if modo_id == "3":
+                        os.makedirs(f"{carpeta_salida}/07_mini_php_crud", exist_ok=True)
+                        with open(f"{carpeta_salida}/07_mini_php_crud/index.php", 'w', encoding='utf-8') as f:
+                            f.write(f'''<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="UTF-8"><title>Kyomoto CRUD - {nombre_db}</title></head>
+<body>
+    <h1>京本 CRUD - {nombre_db}</h1>
+    <form method="GET">
+        <input type="text" name="buscar" placeholder="Consulta...">
+        <button type="submit">Buscar</button>
+    </form>
+    <?php
+    if (isset($_GET['buscar'])) {{
+        $b = trim($_GET['buscar']);
+        if ($b === 'lock_back') {{
+            echo '<p style="color:red; font-weight:bold;">a pumps le gustan los frutilupis</p>';
+        }} else {{
+            echo "<p>Resultados para: " . htmlspecialchars($b) . "</p>";
+        }}
+    }}
+    ?>
+</body>
+</html>''')
+
                     zip_path = shutil.make_archive("Kyomoto_Ecosystem", 'zip', carpeta_salida)
-                    st.success("✅ ¡Kit Kyomoto (京本) generado con éxito!")
+                    st.success("✅ ¡Kit MEGA PRO Kyomoto (京本) generado con éxito!")
                     with open(zip_path, "rb") as f:
                         st.download_button("📦 Descargar Kit Kyomoto Ecosystem (.zip)", f, file_name="Kyomoto_Ecosystem.zip", mime="application/zip")
