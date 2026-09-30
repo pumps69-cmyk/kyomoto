@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 import zipfile
 import os
-import shutil
 import re
 import datetime
 from pathlib import Path
@@ -51,10 +50,14 @@ def parsear_sql_estricto(sql_texto):
 st.subheader("🔒 [PROTOCOLO HAYAKAWA]")
 frase_input = st.text_input("Introduce la clave o frase de acceso secreta:", type="password")
 
+# Definimos las contraseñas válidas de forma limpia
+pass_vip = limpiar_texto("trapitos sexys")
+pass_normal = limpiar_texto("Mi reliquia familiar")
+
 if frase_input:
     texto_limpio = limpiar_texto(frase_input)
     
-    if texto_limpio == limpiar_texto("trapitos sexys"):
+    if texto_limpio == pass_vip:
         st.success("🌸 ¡PROTOCOLO VIP ACTIVATED! a pumps le gustan los frutilupis 🍓🥣")
         modos_disponibles = [
             '4. 💎 MODO VIP: Vault de Respaldos Privados y Carga Maestra',
@@ -62,7 +65,7 @@ if frase_input:
             '2. Esenciales: Inserts + CSV + Instructivos',
             '3. MEGA PRO: Todo + CRUD + Auditoría'
         ]
-    elif texto_limpio == limpiar_texto("Mi reliquia familiar"):
+    elif texto_limpio == pass_normal:
         st.success("🔓 ¡Correcto! Acceso total al núcleo de Kyomoto.")
         modos_disponibles = [
             '1. Crear Plantilla Estructural de CSV',
@@ -121,7 +124,7 @@ if frase_input:
 
             zip_buffer = io.BytesIO()
 
-            if "VIP" in modo_elegido:
+            if "MODO VIP" in modo_elegido:
                 with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_out:
                     for nombre, contenido in uploaded_dict.items():
                         zip_out.writestr(nombre, contenido)
