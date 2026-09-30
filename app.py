@@ -133,7 +133,6 @@ if frase_input:
                     st.error("❌ Error: Se requiere obligatoriamente el archivo .sql guía.")
                 else:
                     orden_t, dic_t, _ = parsear_sql_estricto(sql_texto)
-                    # Generamos archivos CSV estructurales limpios para evitar dependencias de Excel
                     ruta_zip_plantillas = "Kyomoto_Plantillas_CSV.zip"
                     with zipfile.ZipFile(ruta_zip_plantillas, 'w') as zipf:
                         for t in orden_t:
@@ -206,7 +205,7 @@ def generar_kit_final(orden_t, dic_t, nombre_db, datos_en_memoria, sql_texto, cm
 
     if modo_elegido == "3":
         os.makedirs(f"{carpeta_salida}/07_mini_php_crud", exist_ok=True)
-        with open(f"{carpeta_salydaindex.php" if False else f"{carpeta_salida}/07_mini_php_crud/index.php", 'w', encoding='utf-8') as f:
+        with open(f"{carpeta_salida}/07_mini_php_crud/index.php", 'w', encoding='utf-8') as f:
             f.write(f'''<!DOCTYPE html>
 <html lang="es">
 <head><meta charset="UTF-8"><title>Kyomoto CRUD - {nombre_db}</title></head>
