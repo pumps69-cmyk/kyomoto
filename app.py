@@ -1,6 +1,5 @@
 import streamlit as st
 import pandas as pd
-import openpyxl
 import zipfile
 import os
 import re
@@ -69,14 +68,14 @@ if frase_input:
     if acceso_total:
         st.success("🔓 ¡Correcto! Acceso total concedido al núcleo de Kyomoto.")
         modos_disponibles = [
-            '1. Crear Plantilla Estructural de Excel',
-            '2. Esenciales: Inserts + CSV/Excel + Instructivos',
+            '1. Crear Plantilla Estructural de CSV/Datos',
+            '2. Esenciales: Inserts + CSV/Datos + Instructivos',
             '3. MEGA PRO: Todo + CRUD + Auditoría y Seguridad'
         ]
     else:
         st.warning("🚨 Respuesta incorrecta. Acceso restringido ÚNICAMENTE al Modo Básico.")
         modos_disponibles = [
-            '1. Crear Plantilla Estructural de Excel (Única opción disponible)'
+            '1. Crear Plantilla Estructural de CSV/Datos (Única opción disponible)'
         ]
 
     st.markdown("---")
@@ -91,9 +90,9 @@ if frase_input:
     
     st.markdown("---")
     st.subheader("📁 CARGA DE ARCHIVOS")
-    st.info("💡 Sube tu archivo `.sql` (o `.txt`) y tus archivos de datos (`.xlsx`, `.csv`) aquí mismo sin restricciones desde tu celular o PC.")
+    st.info("💡 Sube tu archivo `.sql` (o `.txt`) y tus archivos de datos (`.csv`) aquí mismo sin restricciones desde tu celular o PC.")
     
-    archivos_cargados = st.file_uploader("Seleccionar Archivos", accept_multiple_files=True, type=['sql', 'txt', 'xlsx', 'xls', 'csv'])
+    archivos_cargados = st.file_uploader("Seleccionar Archivos", accept_multiple_files=True, type=['sql', 'txt', 'csv'])
     
     if st.button("🚀 Confirmar y Ejecutar Proceso", type="primary"):
         if not archivos_cargados:
@@ -109,7 +108,6 @@ if frase_input:
 
             sql_texto = ""
             archivos_csv_subidos = []
-            excel_cargado = None
             
             cmd_sql = "INSERT INTO"
             if "IGNORE" in tipo_insercion_txt: cmd_sql = "INSERT IGNORE INTO"
@@ -124,9 +122,6 @@ if frase_input:
                         if not sql_texto:
                             sql_texto = decodificado
                             
-                elif nombre.endswith(('.xlsx', '.xls')):
-                    excel_cargado = nombre
-                    with open(nombre, 'wb') as f: f.write(contenido)
                 elif nombre.endswith('.csv'):
                     archivos_csv_subidos.append(nombre)
                     with open(nombre, 'wb') as f: f.write(contenido)
@@ -138,24 +133,25 @@ if frase_input:
                     st.error("❌ Error: Se requiere obligatoriamente el archivo .sql guía.")
                 else:
                     orden_t, dic_t, _ = parsear_sql_estricto(sql_texto)
-                    ruta_plantilla = "Kyomoto_Plantilla_Estructural.xlsx"
-                    with pd.ExcelWriter(ruta_plantilla, engine='openpyxl') as writer:
+                    # Generamos archivos CSV estructurales limpios para evitar dependencias de Excel
+                    ruta_zip_plantillas = "Kyomoto_Plantillas_CSV.zip"
+                    with zipfile.ZipFile(ruta_zip_plantillas, 'w') as zipf:
                         for t in orden_t:
-                            pd.DataFrame(columns=dic_t[t]['columnas']).to_excel(writer, sheet_name=t, index=False)
+                            df_temp = pd.DataFrame(columns=dic_t[t]['columnas'])
+                            csv_nombre = f"{t}_plantilla.csv"
+                            df_temp.to_csv(csv_nombre, index=False)
+                            zipf.write(csv_nombre)
                     
-                    st.success("✅ Plantilla estructural generada con éxito.")
-                    with open(ruta_plantilla, "rb") as f:
-                        st.download_button("📥 Descargar Plantilla Excel", f, file_name="Kyomoto_Plantilla_Estructural.xlsx")
+                    st.success("✅ Plantillas estructurales generadas con éxito.")
+                    with open(ruta_zip_plantillas, "rb") as f:
+                        st.download_button("📥 Descargar Plantillas CSV (.zip)", f, file_name="Kyomoto_Plantillas_CSV.zip", mime="application/zip")
             else:
                 if not sql_texto:
                     st.error("❌ Error crítico: Se necesita el archivo .sql para validar estructuras.")
                 else:
                     datos_en_memoria = {}
-                    if excel_cargado:
-                        datos_en_memoria = pd.read_excel(excel_cargado, sheet_name=None)
-                    elif archivos_csv_subidos:
-                        for arch in archivos_csv_subidos:
-                            datos_en_memoria[Path(arch).stem] = pd.read_csv(arch)
+                    for arch in archivos_csv_subidos:
+                        datos_en_memoria[Path(arch).stem] = pd.read_csv(arch)
 
                     orden_t, dic_t, nombre_db = parsear_sql_estricto(sql_texto)
                     estructuras_ok = verificar_coincidencia_tablas(orden_t, datos_en_memoria)
@@ -210,7 +206,7 @@ def generar_kit_final(orden_t, dic_t, nombre_db, datos_en_memoria, sql_texto, cm
 
     if modo_elegido == "3":
         os.makedirs(f"{carpeta_salida}/07_mini_php_crud", exist_ok=True)
-        with open(f"{carpeta_salida}/07_mini_php_crud/index.php", 'w', encoding='utf-8') as f:
+        with open(f"{carpeta_salydaindex.php" if False else f"{carpeta_salida}/07_mini_php_crud/index.php", 'w', encoding='utf-8') as f:
             f.write(f'''<!DOCTYPE html>
 <html lang="es">
 <head><meta charset="UTF-8"><title>Kyomoto CRUD - {nombre_db}</title></head>
