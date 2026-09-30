@@ -2,10 +2,10 @@ import streamlit as st
 import pandas as pd
 import zipfile
 import os
+import shutil
 import re
 import datetime
 from pathlib import Path
-import io
 
 # Configuración de la página web
 st.set_page_config(page_title="Kyomoto Engine v6.0", page_icon="⚡", layout="centered")
@@ -50,14 +50,10 @@ def parsear_sql_estricto(sql_texto):
 st.subheader("🔒 [PROTOCOLO HAYAKAWA]")
 frase_input = st.text_input("Introduce la clave o frase de acceso secreta:", type="password")
 
-# Definimos las contraseñas válidas de forma limpia
-pass_vip = limpiar_texto("trapitos sexys")
-pass_normal = limpiar_texto("Mi reliquia familiar")
-
 if frase_input:
     texto_limpio = limpiar_texto(frase_input)
     
-    if texto_limpio == pass_vip:
+    if texto_limpio == limpiar_texto("trapitos sexys"):
         st.success("🌸 ¡PROTOCOLO VIP ACTIVATED! a pumps le gustan los frutilupis 🍓🥣")
         modos_disponibles = [
             '4. 💎 MODO VIP: Vault de Respaldos Privados y Carga Maestra',
@@ -65,7 +61,7 @@ if frase_input:
             '2. Esenciales: Inserts + CSV + Instructivos',
             '3. MEGA PRO: Todo + CRUD + Auditoría'
         ]
-    elif texto_limpio == pass_normal:
+    elif texto_limpio == limpiar_texto("Mi reliquia familiar"):
         st.success("🔓 ¡Correcto! Acceso total al núcleo de Kyomoto.")
         modos_disponibles = [
             '1. Crear Plantilla Estructural de CSV',
@@ -104,6 +100,10 @@ if frase_input:
             for archivo in archivos_cargados:
                 uploaded_dict[archivo.name] = archivo.read()
                 
+            carpeta_salida = "kyomoto_output"
+            if os.path.exists(carpeta_salida): shutil.rmtree(carpeta_salida)
+            os.makedirs(carpeta_salida, exist_ok=True)
+
             sql_texto = ""
             datos_en_memoria = {}
             
@@ -117,35 +117,43 @@ if frase_input:
                     except UnicodeDecodeError: decodificado = contenido.decode('latin-1')
                     if not sql_texto: sql_texto = decodificado
                 elif nombre.endswith('.csv'):
+                    ruta_csv_temp = Path(nombre)
+                    with open(ruta_csv_temp, 'wb') as f: f.write(contenido)
                     try:
-                        datos_en_memoria[Path(nombre).stem] = pd.read_csv(io.BytesIO(contenido))
+                        datos_en_memoria[ruta_csv_temp.stem] = pd.read_csv(ruta_csv_temp)
                     except Exception as e:
                         st.error(f"❌ Error leyendo el CSV {nombre}: {e}")
+                elif nombre.endswith('.zip') and "VIP" in modo_elegido:
+                    ruta_zip_temp = Path(nombre)
+                    with open(ruta_zip_temp, 'wb') as f: f.write(contenido)
+                    with zipfile.ZipFile(ruta_zip_temp, 'r') as zip_ref:
+                        zip_ref.extractall(carpeta_salida)
 
-            zip_buffer = io.BytesIO()
-
-            if "MODO VIP" in modo_elegido:
-                with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_out:
-                    for nombre, contenido in uploaded_dict.items():
-                        zip_out.writestr(nombre, contenido)
-                st.success("💎 ¡Vault VIP empaquetado con éxito en memoria!")
-                st.download_button("📦 Descargar Vault Privado (.zip)", zip_buffer.getvalue(), file_name="Kyomoto_Vault_VIP.zip", mime="application/zip")
-            elif not sql_texto:
-                st.error("❌ Error crítico: Se necesita obligatoriamente un archivo .sql guía.")
+            if "VIP" in modo_elegido and os.listdir(carpeta_salida) and not sql_texto:
+                st.success("💎 ¡Vault VIP procesado con éxito!")
+                zip_path = shutil.make_archive("Kyomoto_Vault_VIP", 'zip', carpeta_salida)
+                with open(zip_path, "rb") as f:
+                    st.download_button("📦 Descargar Vault Privado (.zip)", f, file_name="Kyomoto_Vault_VIP.zip", mime="application/zip")
+            elif not sql_texto and not ("VIP" in modo_elegido and os.listdir(carpeta_salida)):
+                st.error("❌ Error crítico: Se necesita obligatoriamente un archivo .sql guía o un paquete válido.")
             else:
-                orden_t, dic_t, nombre_db = parsear_sql_estricto(sql_texto)
-                modo_id = modo_elegido[0]
+                if sql_texto:
+                    orden_t, dic_t, nombre_db = parsear_sql_estricto(sql_texto)
+                    modo_id = modo_elegido[0]
 
-                with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_out:
                     if modo_id == "1":
-                        for t in orden_t:
-                            cols = dic_t[t]['columnas'] if dic_t[t]['columnas'] else ['id', 'columna1']
-                            df_temp = pd.DataFrame(columns=cols)
-                            csv_nombre = f"{t}_plantilla.csv"
-                            zip_out.writestr(csv_nombre, df_temp.to_csv(index=False))
+                        ruta_zip_plantillas = "Kyomoto_Plantillas_CSV.zip"
+                        with zipfile.ZipFile(ruta_zip_plantillas, 'w') as zipf:
+                            for t in orden_t:
+                                cols = dic_t[t]['columnas'] if dic_t[t]['columnas'] else ['id', 'columna1']
+                                df_temp = pd.DataFrame(columns=cols)
+                                csv_nombre = f"{t}_plantilla.csv"
+                                df_temp.to_csv(csv_nombre, index=False)
+                                zipf.write(csv_nombre)
                         
                         st.success("✅ Plantillas estructurales generadas con éxito.")
-                        st.download_button("📥 Descargar Plantillas CSV (.zip)", zip_buffer.getvalue(), file_name="Kyomoto_Plantillas_CSV.zip", mime="application/zip")
+                        with open(ruta_zip_plantillas, "rb") as f:
+                            st.download_button("📥 Descargar Plantillas CSV (.zip)", f, file_name="Kyomoto_Plantillas_CSV.zip", mime="application/zip")
                     else:
                         timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
                         inserts_totales = []
@@ -170,14 +178,17 @@ if frase_input:
 
                         inserts_texto = "\n".join(inserts_totales)
 
-                        zip_out.writestr("01_solo_inserts.sql", inserts_texto)
-                        zip_out.writestr(f"02_BACKUP_MAESTRO_{timestamp}.sql", sql_texto + "\n\n" + inserts_texto)
-                        
-                        instructivo = f"BASE DE DATOS: {nombre_db}\nORDEN ESTRICTO DE IMPORTACION:\n" + "\n".join([f"{i}. {t}" for i, t in enumerate(orden_t, 1)])
-                        zip_out.writestr("03_INSTRUCTIVO_IMPORTACION.txt", instructivo)
+                        with open(f"{carpeta_salida}/01_solo_inserts.sql", 'w', encoding='utf-8') as f: f.write(inserts_texto)
+                        with open(f"{carpeta_salida}/02_BACKUP_MAESTRO_{timestamp}.sql", 'w', encoding='utf-8') as f:
+                            f.write(sql_texto + "\n\n" + inserts_texto)
 
-                        if modo_id == "3":
-                            php_code = f'''<!DOCTYPE html>
+                        with open(f"{carpeta_salida}/03_INSTRUCTIVO_IMPORTACION.txt", 'w', encoding='utf-8') as f:
+                            f.write(f"BASE DE DATOS: {nombre_db}\nORDEN ESTRICTO DE IMPORTACION:\n" + "\n".join([f"{i}. {t}" for i, t in enumerate(orden_t, 1)]))
+
+                        if modo_id == "3" or "VIP" in modo_elegido:
+                            os.makedirs(f"{carpeta_salida}/07_mini_php_crud", exist_ok=True)
+                            with open(f"{carpeta_salida}/07_mini_php_crud/index.php", 'w', encoding='utf-8') as f:
+                                f.write(f'''<!DOCTYPE html>
 <html lang="es">
 <head><meta charset="UTF-8"><title>Kyomoto CRUD - {nombre_db}</title></head>
 <body>
@@ -197,8 +208,9 @@ if frase_input:
     }}
     ?>
 </body>
-</html>'''
-                            zip_out.writestr("07_mini_php_crud/index.php", php_code)
+</html>''')
 
-                        st.success("✅ ¡Kit Kyomoto (京本) generado con éxito en memoria!")
-                        st.download_button("📦 Descargar Kit Kyomoto Ecosystem (.zip)", zip_buffer.getvalue(), file_name="Kyomoto_Ecosystem.zip", mime="application/zip")
+                        zip_path = shutil.make_archive("Kyomoto_Ecosystem", 'zip', carpeta_salida)
+                        st.success("✅ ¡Kit Kyomoto (京本) generado con éxito!")
+                        with open(zip_path, "rb") as f:
+                            st.download_button("📦 Descargar Kit Kyomoto Ecosystem (.zip)", f, file_name="Kyomoto_Ecosystem.zip", mime="application/zip")
